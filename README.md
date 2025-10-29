@@ -4,8 +4,8 @@
 
 Лінник Нікіта 
 
-«Правила оформлення програмного коду: Google JavaScript Style Guide»
+Правила оформлення програмного коду: Google JavaScript Style Guide
 
-«Методи рефакторингу коду програмного забезпечення: Extract Method, Rename Variable, Extract Class»
+Методи рефакторингу коду програмного забезпечення: Extract Method, Rename Variable, Extract Class
 
-«Програмна система для вивчення іноземних мов»
+Програмна система для вивчення іноземних мов
