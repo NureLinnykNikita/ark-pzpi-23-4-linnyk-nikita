@@ -1,1 +1,624 @@
+Міністерство освіти і науки України
+Харківський національний університет радіоелектроніки
+Кафедра програмної інженерії
 
+
+
+
+
+
+
+
+ЗВІТ
+з лабораторної роботи №2
+з дисципліни: «Аналіз та рефакторинг коду»
+
+
+
+
+
+
+
+
+Виконав
+ст. гр. ПЗПІ-23-4
+Лінник Нікіта Анатолійович
+
+
+
+
+Перевірив
+ст. викладач кафедри ПІ
+Сокорчук Ігор Петрович
+
+
+
+
+
+
+
+
+Харків 2025
+1 ІСТОРІЯ ЗМІН
+№
+	Дата
+	Версія звіту
+	Опис змін та виправлень
+	1
+	30.11.2025
+	1
+	Створено розділ «Завдання»
+	2
+	30.11.2025
+	1
+	Створено розділ «Опис виконаної роботи»
+	3
+	30.11.2025
+	1
+	Створено розділ «Висновки»
+	4
+	30.11.2025
+	1
+	Створено розділ «Використані джерела»
+	5
+	30.11.2025
+	1
+	Створено розділ «Додаток А»
+	6
+	30.11.2025
+	1
+	Створено розділ «Додаток Б»
+	
+
+2 ЗАВДАННЯ
+Ознайомитися з процесом розробки серверної частини програмної системи, включаючи проектування бази даних (БД), розробку API для взаємодії з клієнтами, та перевірку (тестування) їхньої взаємодії. Оволодіти методами проектування діаграм UML та ER, розробки БД, програмної реалізації API, а також роботи з репозиторіями Git та створення технічної документації.
+
+
+3 ОПИС ВИКОНАНОЇ РОБОТИ
+        Темою проєкту для лабораторних робіт - система для вивчення іноземних мов.
+        Архітектурні рішення. Сервер реалізовано на Node.js + Express.js, що забезпечує високу продуктивність та обробку великої кількості асинхронних запитів. Обмін даними здійснюється через REST API. База даних - PostgreSQL, оскільки вона забезпечує надійність, підтримку складних структур даних та стабільну роботу зі зв’язками.
+Опишемо моделі та зв’язки у системі:
+        1. Користувач (User): сутність з обліковими даними про самого користувача системи. Користувач пов’язан з усіма іншими сутностями системи. Користувач може мати одну роль(“user” або “admin”).
+Зв'язки:
+* 1:N з Enrollment (один користувач може мати багато підписок на курси).
+* 1:N з ExerciseProgress (користувач має історію проходження багатьох вправ).
+* 1:N з UserLanguages (користувач може знати/вивчати кілька мов).
+* 1:N з Message (користувач є автором багатьох повідомлень).
+        2. Мова (Language): довідник мов, доступних у системі (наприклад, English, Ukrainian). Використовується як для позначення мови курсу, так і для позначення рідної мови користувача.
+        Зв'язки:
+* 1:N з Course (одна мова може вивчатися у багатьох курсах).
+* 1:N з UserLanguages.
+        3. Мови користувача (User Languages): проміжна сутність для реалізації зв'язку "багато-до-багатьох" між користувачами та мовами. Дозволяє вказати, які мови знає користувач або які вивчає.
+Зв'язки: Зв'язує User та Language.
+4. Курс (Course): навчальна програма певної мови та рівня складності (A1-C2). Є контейнером для уроків.
+Зв'язки:
+N:1 з Language (курс належить до певної мови).
+1:N з Lesson (курс складається з багатьох уроків).
+1:N з Enrollment.
+5. Запис (Enrollment): сутність, що фіксує факт навчання конкретного користувача на конкретному курсі. Зберігає загальний прогрес (у відсотках) та статус (active, completed).
+Зв'язки: Зв'язує User та Course (many-to-many).
+6. Урок (Lesson): структурна одиниця курсу, що об'єднує теоретичний матеріал та практичні завдання певної теми. Має порядковий номер (sequence).
+Зв'язки:
+* N:1 з Course.
+* 1:N з Exercise (урок містить набір вправ).
+7. Вправа (Exercise): практичне завдання (тест, аудіювання, переклад) для перевірки знань. Містить метадані (варіанти відповідей, правильну відповідь) та медіа-контент.
+8. Прогрес вправи (Exercise progress): дані про те, наскільки успішно користувач впорався з певною вправою. Зберігає інформацію про успішність (бали), кількість спроб та правильність відповіді.
+Зв'язки: Зв'язує User та Exercise.
+9. Досягнення (Achievement): перелік нагород за різні дії у системі, наприклад, за виконання 1 вправи або за повне завершення курсу.
+Зв'язки:
+* 1:N з UserAchievements.
+10. Досягнення користувача (User achievements): фіксує факт отримання нагороди користувачем та час її отримання.
+11. Бесіда (Conversation): контейнер для листування. Може бути приватним діалогом або груповим
+Зв'язки:
+* 1:N з ConversationParticipants.
+* 1:N з Message.
+12. Учасники бесіди (Conversation participants): визначає, які користувачі мають доступ до конкретної бесіди
+Зв'язки: Зв'язує Conversation та User.
+13. Повідомлення (Message): повідомлення, що користувачі надсилають одне одному у ході бесіди.
+Зв'язки:
+* N:1 з Conversation (повідомлення належить бесіді).
+* N:1 з User (повідомлення має автора).
+        
+        Створимо UML-діаграму прецедентів, яка включає дії користувачів та взаємодії між ними та системою (рис. Б.1).
+        Створимо ER-діаграму. Вона відображатиме сутності системи, їх атрибути та зв’язки між ними (рис. Б.2).
+        На основі ER-діаграми спроєктуємо таблиці БД.
+Нормалізація. 1NF вимагає, щоб усі записи у стовпцях були атомарними, кожен рядок був унікальним, типи даних одного стовпця повинні співпадати. У нашій моделі сутності були розбиті на окремі таблиці, де кожен атрибут вже є атомарним: немає переліків, повторюваних груп. Кожний рядок унікальний, що забезпечується первинним ключем-лічильним або складеним первинним ключем. Кожен атрибут має свій тип даних. Отже, схема відповідає 1NF.
+2NF - таблиця у 1NF та всі неключові атрибути повністю залежать від первинного складеного ключа. У системі є 3 таблиці зі складений первинним ключем: записи(Enrollments), досягнення користувача(User_achievements), учасники бесіди(conversation_participants). 
+        Таблиця Enrollments має складений ключ (user_id, course_id). Усі неключові атрибути цієї таблиці не можуть окремо залежати від user_id чи від course_id або від штучно створеного первинного ключа, оскільки необхідно запобігти запису користувача на той самий курс, що забезпечується тільки складений первинним ключем. 
+        Таблиці user_achievements та conversation_participants мають такі самі за логікою складені первинні ключі(user_id, achivement_id; conversation_id, user_id). Усі неключові атрибути цих таблиць не можуть залежати від однієї з частин складеного ключа або від штучно створеного, оскільки необхідно забезпечувати унікальність записів у таблиці. 
+Усі інші таблиці мають штучний первинний ключ, що унеможливлює залежність від частини первинного ключа. Отже, схема належить до 2NF.
+        3NF - таблиця у 2NF та відсутні будь-які транзитивні залежності(залежність поля не від первинного ключа, а від іншого неключового поля). Таблиці не мають атрибутів, що описували б інші неключові атрибути. Усі зв’язки реалізовано через зовнішні ключі. Отже, схема відповідає 3NF.
+
+
+Специфікація API.
+Для API було використано RESTful API. Таблиця 1.1 описує ендпоінти, їхні методи та параметри.
+Таблиця 1.1
+Ендпоінт
+	Метод
+	Опис
+	Параметри
+	/register
+	POST
+	Реєстрація користувача у системі
+	email, password, username
+	/login
+	POST
+	Вхід у систему
+	email, password
+	/languages
+	GET
+	Отримати список мов у системі
+	-
+	/languages
+	POST
+	Додавання нової мови до системи
+	code, name
+	/users/{userId}/languages/{languageId}
+	POST
+	Надати мову до певного користувача
+	userId, languageId
+	/users/{userId}/languages
+	GET
+	Список мов користувача
+	userId
+	/courses
+	GET
+	Отримати курси у системі
+	-
+	/courses
+	POST
+	Створити новий курс
+	title, description, level, languageId
+	/courses/{courseId}
+	PATCH
+	Оновити дані курсу
+	courseId
+	/courses/{courseId}
+	DELETE
+	Видалити курс
+	courseId
+	/courses/enrollments
+	POST
+	Запис користувача до курсу
+	userId, courseId
+	/lessons
+	POST
+	Створити новий урок
+	courseId, title, order, description
+	/courses/{id}/lessons
+	GET
+	Отримати перелік уроків певного курсу
+	id
+	/lessons/{id}/exercises
+	GET
+	Отримати вправи уроку
+	id
+	/exercises
+	POST
+	Створити нову вправу
+	lessonId, question, correctAnswer, type, metadata, correct_answer, media_url, points, sequence
+	/exercises/progress
+	POST
+	Запис прогресу вправи
+	exerciseId, userId, 
+isCorrect, earnedPoints, attemptNumber
+	/achievements
+	POST
+	Створити нове досягнення
+	code, title, description, category, iconUrl, conditionType, conditionValue
+	/users/{userId}/achievements
+	GET
+	Отримати досягнення користувача
+	userId
+	/users/{userId}/achievements/{achievementId}
+	POST
+	Надати досягнення до користувача
+	userId, achievementId
+	/conversations
+	POST
+	Створити нову бесіду
+	title, isGroup, participantIds
+	/conversations/{conversationId}/messages
+	POST
+	Відправити повідомлення в бесіді
+	conversationId
+	/conversations/{conversationId}/messages
+	GET
+	Отримати всі повідомлення з бесіди
+	conversationId
+	
+
+
+
+        Розробляємо функції для роботи з базою даних, використовуючи Prisma ORM, що підтримують CRUD-операції для основних сутностей. Реалізуємо серверну частину, що забезпечує доступ до БД і обробку запитів через API.
+
+
+
+
+
+
+4 ВИСНОВКИ
+        У ході виконання роботи було опрацьовано процес документування програмних проєктів. Створено діаграму прецедентів, ER-діаграму, структуру бази даних та діаграму БД. Реалізовано роботу з даними за допомогою Prisma ORM і розроблено REST API зі специфікацією. Виконана робота дозволила закріпити навички моделювання, опису вимог та створення API, що є важливими етапами у розробці сучасних інформаційних систем.
+
+
+5 ВИКОРИСТАНІ ДЖЕРЕЛА
+        1. PostgreSQL: Documentation. PostgreSQL: The world's most advanced open source database. URL: https://www.postgresql.org/docs/ (дата звернення: 08.12.2025).
+        2. Prisma | Next-generation ORM for Node.js & TypeScript. Prisma. URL: https://www.prisma.io/orm (дата звернення: 08.12.2025).
+        3. Express - Node.js web application framework. Express - Node.js web application framework. URL: https://expressjs.com/ (дата звернення: 08.12.2025).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ДОДАТОК А
+        Відео-посилання на YouTube: https://youtu.be/-V3DJjZB9bo
+Хронологічний опис відеозапису:
+00:00 - Вступ
+00:45 - Функціонал системи
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ДОДАТОК Б
+Графічні матеріали
+
+
+  
+
+Рис. Б.1 - Діаграма прецедентів
+  
+
+Рис. Б.2 - ER-діаграма
+
+
+  
+
+Рис. Б.3 - Діаграма структури БД
+ДОДАТОК В
+Код створення таблиць бд:
+CREATE TYPE user_role as ENUM ('user', 'admin');
+
+
+CREATE TYPE course_level as ENUM ('A1', 'A2', 'B1', 'B2', 'C1', 'C2');
+
+
+CREATE TYPE exercise_type as ENUM ('reading', 'listening', 'writing', 'speaking', 'translation');
+
+
+CREATE TYPE enrollment_course_status as ENUM ('active', 'completed', 'canceled');
+
+
+CREATE TYPE participant_type as ENUM ('user', 'ai');
+
+
+
+
+
+
+CREATE FUNCTION update_updated_at()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+AS
+$$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+
+CREATE TRIGGER users_updated_at
+    BEFORE UPDATE
+    ON users
+    FOR EACH ROW
+EXECUTE FUNCTION update_updated_at();
+
+
+CREATE TRIGGER courses_updated_at
+    BEFORE UPDATE
+    on courses
+    FOR EACH ROW
+EXECUTE FUNCTION update_updated_at();
+
+
+CREATE TRIGGER lessons_updated_at
+    BEFORE UPDATE
+    ON lessons
+    FOR EACH ROW
+EXECUTE FUNCTION update_updated_at();
+
+
+
+
+CREATE TABLE users
+(
+    user_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username        VARCHAR(50) UNIQUE  NOT NULL,
+    email           VARCHAR(100) UNIQUE NOT NULL,
+    password_hash   TEXT                NOT NULL,
+    native_language_id INT,
+    role            user_role           NOT NULL DEFAULT 'user',
+    created_at      TIMESTAMP                    DEFAULT NOW(),
+    updated_at      TIMESTAMP                    DEFAULT NOW(),
+
+
+    FOREIGN KEY (native_language_id) REFERENCES languages(id) ON DELETE SET NULL
+);
+
+
+CREATE TABLE courses
+(
+    course_id SERIAL PRIMARY KEY,
+    title VARCHAR(50) NOT NULL,
+    description TEXT,
+    target_language_id INT NOT NULL,
+    level course_level NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+
+
+    FOREIGN KEY (language_id) REFERENCES languages(id) ON DELETE SET NULL
+);
+
+
+CREATE TABLE lessons
+(
+    lesson_id SERIAL PRIMARY KEY,
+    course_id INT NOT NULL,
+    title VARCHAR(50) NOT NULL,
+    description TEXT,
+    sequence INT NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+
+
+    FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE,
+
+
+    UNIQUE (course_id, sequence)
+);
+
+
+CREATE TABLE enrollments
+(
+    user_id UUID NOT NULL,
+    course_id INT NOT NULL,
+    status enrollment_course_status NOT NULL DEFAULT 'active',
+    progress INT NOT NULL DEFAULT 0 CHECK (progress BETWEEN 0 AND 100),
+    enrolled_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    completed_at TIMESTAMP,
+    last_lesson_id INT,
+
+
+    PRIMARY KEY (user_id, course_id),
+
+
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE,
+    FOREIGN KEY (last_lesson_id) REFERENCES lessons(lesson_id) ON DELETE SET NULL
+);
+
+
+CREATE TABLE exercises
+(
+    exercise_id SERIAL PRIMARY KEY,
+    lesson_id INT NOT NULL,
+    type exercise_type NOT NULL,
+    question TEXT NOT NULL,
+    metadata JSONB,
+    correct_answer TEXT NOT NULL,
+    media_url TEXT,
+    points INT DEFAULT 1,
+    sequence INT NOT NULL,
+
+
+    FOREIGN KEY (lesson_id) REFERENCES lessons(lesson_id) ON DELETE CASCADE,
+
+
+    UNIQUE (lesson_id, sequence)
+);
+
+
+CREATE TABLE exercise_progress
+(
+    id SERIAL PRIMARY KEY,
+    user_id UUID NOT NULL,
+    exercise_id INT NOT NULL,
+
+
+    is_correct BOOLEAN NOT NULL,
+    earned_points INT DEFAULT 0,
+
+
+    attempt_number INT DEFAULT 1,
+
+
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+
+
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (exercise_id) REFERENCES exercises(exercise_id) ON DELETE CASCADE
+);
+
+
+CREATE TABLE conversations
+(
+    conversation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT,
+    is_group BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+CREATE TABLE messages
+(
+    message_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    conversation_id UUID NOT NULL,
+
+
+    sender_type participant_type DEFAULT 'user',
+    sender_id UUID,
+
+
+    content TEXT NOT NULL,
+    is_read BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+
+    FOREIGN KEY (conversation_id)
+        REFERENCES conversations(conversation_id)
+        ON DELETE CASCADE,
+
+
+    FOREIGN KEY (sender_id)
+        REFERENCES users(user_id)
+        ON DELETE SET NULL
+);
+
+
+CREATE TABLE conversation_participants
+(
+    conversation_id UUID NOT NULL,
+    participant_id UUID,
+    participant_type participant_type NOT NULL,
+    joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+
+    PRIMARY KEY (conversation_id, participant_id, participant_type),
+
+
+    FOREIGN KEY (conversation_id)
+        REFERENCES conversations(conversation_id)
+        ON DELETE CASCADE,
+
+
+    FOREIGN KEY (participant_id)
+        REFERENCES users(user_id)
+        ON DELETE CASCADE
+);
+
+
+CREATE TABLE achievements
+(
+    achievement_id SERIAL PRIMARY KEY,
+    code VARCHAR(50) UNIQUE NOT NULL,
+    title VARCHAR(100) NOT NULL,
+    description TEXT NOT NULL,
+
+
+    category VARCHAR(50),
+    icon_url TEXT,
+
+
+    condition_type VARCHAR(50) NOT NULL,
+    condition_value INT,
+
+
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+
+CREATE TABLE user_achievements
+(
+    user_id UUID NOT NULL,
+    achievement_id INT NOT NULL,
+
+
+    earned_at TIMESTAMP DEFAULT NOW(),
+    is_notified BOOLEAN DEFAULT false,
+
+
+    PRIMARY KEY (user_id, achievement_id),
+
+
+    FOREIGN KEY (user_id)
+        REFERENCES users(user_id)
+        ON DELETE CASCADE,
+
+
+    FOREIGN KEY (achievement_id)
+        REFERENCES achievements(achievement_id)
+        ON DELETE CASCADE
+);
+
+
+CREATE TABLE languages
+(
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(10) NOT NULL UNIQUE,
+    name VARCHAR(50) NOT NULL
+);
+
+
+CREATE TABLE user_languages
+(
+    id SERIAL PRIMARY KEY,
+    user_id UUID NOT NULL,
+    language_id INT NOT NULL,
+
+
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (language_id) REFERENCES languages(id) ON DELETE CASCADE,
+
+
+    UNIQUE (user_id, language_id)
+)
