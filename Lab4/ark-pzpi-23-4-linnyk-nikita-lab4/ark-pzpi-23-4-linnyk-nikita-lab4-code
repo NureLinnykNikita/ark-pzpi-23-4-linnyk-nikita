@@ -1,0 +1,216 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include <LiquidCrystal_I2C.h>
+
+const char* ssid = "Wokwi-GUEST";
+const char* password = "";
+
+String serverUrl = "https://lang-bang.vercel.app/api"; 
+
+String jwtToken = "...";
+
+#define BTN_A_PIN 12
+#define BTN_B_PIN 14
+#define BTN_NEXT_PIN 27
+#define LED_GREEN_PIN 26
+#define LED_RED_PIN 25
+#define BUZZER_PIN 32
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+String userId = "8f89ddf5-b848-4c5e-8034-7a3fe5b11503";
+int currentExerciseId = 0;
+String currentCorrectAnswer = "";
+bool waitingForInput = false;
+int currentExerciseIndex = 0;
+int lessonId = 2;
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(BTN_A_PIN, INPUT_PULLUP);
+  pinMode(BTN_B_PIN, INPUT_PULLUP);
+  pinMode(BTN_NEXT_PIN, INPUT_PULLUP);
+  pinMode(LED_GREEN_PIN, OUTPUT);
+  pinMode(LED_RED_PIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0, 0);
+  lcd.print("LangBang IoT");
+
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  
+  lcd.clear();
+  lcd.print("Connected!");
+  delay(1000);
+  
+  fetchNextExercise();
+}
+
+void loop() {
+  if (waitingForInput) {
+    if (digitalRead(BTN_A_PIN) == LOW) {
+      handleAnswer("OptionA"); 
+      delay(300); 
+    } 
+    else if (digitalRead(BTN_B_PIN) == LOW) {
+      handleAnswer("OptionB");
+      delay(300);
+    }
+    else if (digitalRead(BTN_NEXT_PIN) == LOW) {
+      lcd.clear();
+      lcd.print("Skipping...");
+      currentExerciseIndex++;
+      fetchNextExercise();
+      delay(300);
+    }
+  }
+}
+
+void fetchNextExercise() {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    
+    String url = serverUrl + "/lessons/" + String(lessonId) + "/exercises"; 
+    
+    lcd.clear();
+    lcd.print("Loading...");
+    
+    http.begin(url);
+    
+    http.addHeader("Authorization", "Bearer " + jwtToken);
+    
+    int httpCode = http.GET();
+
+    if (httpCode > 0) {
+      String payload = http.getString();
+      Serial.println("Response: " + payload); 
+
+      DynamicJsonDocument doc(4096); 
+      DeserializationError error = deserializeJson(doc, payload);
+
+      if (!error) {
+    JsonArray exercisesArr = doc["exercises"].as<JsonArray>();
+
+    if (!exercisesArr.isNull() && exercisesArr.size() > currentExerciseIndex) {
+          JsonObject exercise = exercisesArr[currentExerciseIndex]; 
+          
+          currentExerciseId = exercise["exerciseId"];
+          const char* question = exercise["question"];
+          const char* answer = exercise["correctAnswer"];
+          currentCorrectAnswer = String(answer);
+
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          String qStr = String(question);
+          if (qStr.length() > 16) {
+              lcd.print(qStr.substring(0, 16));
+          } else {
+              lcd.print(qStr);
+          }
+          
+          Serial.println("Q: " + String(question));
+          Serial.println("A: " + currentCorrectAnswer);
+          
+          lcd.setCursor(0, 1);
+          lcd.print("A:Yes B:No"); 
+          
+          waitingForInput = true;
+        } else {
+          lcd.clear();
+          lcd.print("No exercises");
+          Serial.println("Key 'exercises' missing or array empty");
+        }
+      } else {
+        lcd.clear();
+        lcd.print("JSON Error");
+        Serial.println("Parse error: " + String(error.c_str()));
+      }
+    } else {
+      lcd.clear();
+      lcd.print("HTTP Err: " + String(httpCode));
+      Serial.println("HTTP Error: " + String(httpCode));
+    }
+    http.end();
+  }
+}
+
+void handleAnswer(String userAnswer) {
+  waitingForInput = false;
+  lcd.clear();
+  lcd.print("Checking...");
+
+  String answerToSend = (userAnswer == "OptionA") ? currentCorrectAnswer : "wrong_val";
+
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    
+    String url = serverUrl + "/exercises/" + String(currentExerciseId) + "/submit";
+    
+    http.begin(url);
+    
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("Authorization", "Bearer " + jwtToken);
+
+    StaticJsonDocument<200> doc;
+    doc["answer"] = answerToSend; 
+
+    String requestBody;
+    serializeJson(doc, requestBody);
+
+    int httpResponseCode = http.POST(requestBody);
+    
+    if (httpResponseCode > 0) {
+      String response = http.getString();
+      Serial.println("Submit res: " + response);
+      
+      DynamicJsonDocument resDoc(1024);
+      deserializeJson(resDoc, response);
+      
+      bool isCorrect = resDoc["submittedExercise"]["isCorrect"];
+
+      Serial.print("Is Correct parsed: "); 
+      Serial.println(isCorrect);
+      
+      if (isCorrect) {
+        showFeedback(true);
+      } else {
+        showFeedback(false);
+      }
+    } else {
+      lcd.clear();
+      lcd.print("Err: " + String(httpResponseCode));
+    }
+    http.end();
+  }
+  
+  delay(2000);
+  currentExerciseIndex++;
+  fetchNextExercise();
+}
+
+void showFeedback(bool success) {
+  lcd.clear();
+  if (success) {
+    lcd.print("Correct! :)");
+    digitalWrite(LED_GREEN_PIN, HIGH);
+    tone(BUZZER_PIN, 1000, 200); 
+    delay(200);
+    tone(BUZZER_PIN, 1500, 200);
+  } else {
+    lcd.print("Wrong! :(");
+    digitalWrite(LED_RED_PIN, HIGH);
+    tone(BUZZER_PIN, 200, 500); 
+  }
+  
+  delay(1500);
+  digitalWrite(LED_GREEN_PIN, LOW);
+  digitalWrite(LED_RED_PIN, LOW);
+}
